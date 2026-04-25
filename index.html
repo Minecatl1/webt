@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tailscale Device Dashboard</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+    .device { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .device h2 { margin: 0 0 0.5rem; }
+    .ip { font-weight: bold; color: #333; }
+    .service-link { display: inline-block; margin: 0.5rem 0.5rem 0 0; text-decoration: none; padding: 0.2rem 0.5rem; background: #f0f0f0; border-radius: 4px; }
+    .service-link:hover { background: #ddd; }
+    #loading, #error { text-align: center; margin-top: 2rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>My Tailnet Devices</h1>
+  <div id="loading">Loading…</div>
+  <div id="error" style="display:none;">Could not load device data. Is <code>devices.json</code> present?</div>
+  <div id="devices"></div>
+
+  <script>
+    async function load() {
+      try {
+        const resp = await fetch('devices.json');
+        if (!resp.ok) throw new Error('Not found');
+        const devices = await resp.json();
+        render(devices);
+      } catch (e) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+      }
+    }
+
+    function render(devices) {
+      document.getElementById('loading').style.display = 'none';
+      const container = document.getElementById('devices');
+      if (devices.length === 0) {
+        container.innerHTML = '<p>No devices online right now.</p>';
+        return;
+      }
+
+      const commonServices = [
+        { name: 'HTTP (80)', port: 80 },
+        { name: 'HTTPS (443)', port: 443 },
+        { name: 'SSH (22)', port: 22 },
+        { name: 'Jellyfin (8096)', port: 8096 },
+      ];
+
+      for (const d of devices) {
+        const card = document.createElement('div');
+        card.className = 'device';
+        card.innerHTML = `
+          <h2>${escapeHtml(d.name)}</h2>
+          <p>${d.os ? '🖥️ ' + escapeHtml(d.os) : ''}</p>
+          <p>Tailscale IP: <span class="ip">${escapeHtml(d.ip)}</span></p>
+          <div>
+            ${commonServices.map(s => 
+              `<a class="service-link" href="http://${d.ip}:${s.port}" target="_blank">${s.name}</a>`
+            ).join('')}
+            ${d.hostname ? `<a class="service-link" href="http://${d.hostname}" target="_blank">MagicDNS</a>` : ''}
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    load();
+  </script>
+</body>
+</html>
